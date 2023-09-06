@@ -40,7 +40,7 @@ This is a simple arbitrage trading bot written in Python. The bot aims to identi
 
 3. Run the Python script.
     ```
-    python arbitrage_bot.py
+    python trader_v1.py
     ```
 
 **Note**: Before running the bot with real money, make sure to test extensively and understand the associated risks.
