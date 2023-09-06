@@ -10,7 +10,7 @@ BASE_URL = 'https://paper-api.alpaca.markets'
 api = tradeapi.REST(key_id=PUB_KEY, secret_key=SEC_KEY, base_url=BASE_URL)
 
 # Initialize
-currency_pairs = ['USD/EUR', 'USD/GBP', 'USD/JPY']  # Make sure these pairs are available on Alpaca
+currency_pairs = ['USD_EUR', 'USD_GBP', 'USD_JPY']  # Make sure these pairs are available on Alpaca
 exchanges = ['Alpaca']
 threshold_profit_margin = 0.01
 trading_capital = 10.0
@@ -23,12 +23,32 @@ r = redis.Redis(host='localhost', port=6379, db=0)
 def get_price(exchange, pair):
     market_data = api.get_barset(pair, 'minute', limit=1)
     close_price = market_data[pair][0].c
-    # Assuming a 0.02 spread between buy and sell for simplicity
     return close_price - 0.01, close_price + 0.01
 
-# Function to simulate executing a trade
+# Function to execute a trade
 def execute_trade(buy_exchange, sell_exchange, pair):
-    print(f"Executed trade: Bought {pair} from {buy_exchange} and sold on {sell_exchange}")
+    base_currency, quote_currency = pair.split('_')
+    amount = trading_capital / lowest_buy_price
+
+    # Execute buy order
+    buy_order = api.submit_order(
+        symbol=pair,
+        qty=amount,
+        side='buy',
+        type='market',
+        time_in_force='gtc'
+    )
+    
+    # Execute sell order
+    sell_order = api.submit_order(
+        symbol=pair,
+        qty=amount,
+        side='sell',
+        type='market',
+        time_in_force='gtc'
+    )
+    
+    print(f"Executed trade: Bought {amount} {pair} from {buy_exchange} and sold on {sell_exchange}")
 
 # Function to populate Redis with data
 def fetch_data(pair):
@@ -39,6 +59,9 @@ def fetch_data(pair):
 
 # Main trading logic
 def main():
+    global trading_capital  # To modify the trading_capital global variable
+    global lowest_buy_price  # To access the lowest_buy_price for calculating the amount in execute_trade()
+
     while True:
         for pair in currency_pairs:
             lowest_buy_price = float('inf')
@@ -58,13 +81,13 @@ def main():
                     highest_sell_price = sell_price
                     sell_exchange = exchange
             
-            potential_profit = highest_sell_price - lowest_buy_price - 0.002  # Assume 0.002 as transaction fee
+            potential_profit = highest_sell_price - lowest_buy_price - 0.002
             
             if potential_profit > threshold_profit_margin:
                 execute_trade(buy_exchange, sell_exchange, pair)
                 trading_capital += potential_profit
 
-        time.sleep(60)  # Repeat every minute
+        time.sleep(60)
 
 # Fetch data using threads
 with ThreadPoolExecutor(max_workers=len(currency_pairs)) as executor:
